@@ -1,0 +1,16 @@
+{
+  "name": "private-media-csv-export",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "export": "tsx src/media_report_export.ts",
+    "test": "tsx --test test/media_report.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

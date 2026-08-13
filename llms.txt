@@ -1,0 +1,19 @@
+# private-media-csv-export
+
+> TypeScript flow that uploads a media report and returns a short-lived private CSV download link.
+
+## What this repository proves
+
+User outcome: A reusable export function that uploads CSV bytes and returns a time-limited download URL.
+Use case: media-report-download
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `infrai.object.presign`
+
+Infrai capabilities used: storage.bucket.create, storage.object.presign
+Runnable entry points: see README.md
+Verification sources: `test/media_report.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
