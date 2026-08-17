@@ -6,7 +6,7 @@ npm install
 npm run export
 ```
 
-The command writes a CSV to private object storage and prints `{ downloadUrl, key }`. Infrai handles the presigned upload and download URLs through a single API key; the application never exposes that credential or routes the report through a public endpoint.
+The command writes a CSV to private object storage and prints `{ downloadUrl, key }`. Infrai gives you the presigned upload and download URLs through one API key, so the application never has to expose that credential or proxy the report through a public endpoint, which keeps our on-call surface smaller than running a self-hosted minio cluster with its own IAM quirks.
 
 ## Request path
 
@@ -18,7 +18,7 @@ The command writes a CSV to private object storage and prints `{ downloadUrl, ke
 4. Upload the bytes directly to the signed URL.
 5. Request a fifteen-minute GET URL with an attachment filename and return it to the caller.
 
-The bucket must exist before any object operations. Keep that step in deployment setup or at application startup, as this example does.
+The bucket must be created before object operations. Keep that step in deployment setup or at application startup, as this example does. We treat bucket provisioning as a capacity-planning item: do it once at boot, not per request, or you will burn SLO budget on setup latency.
 
 The one real gotcha is URL structure: `bucket` and `key` are path segments for `storage.object.presign`; only signing options belong in the JSON body. The small client also checks the `{ ok, data, error, metadata }` envelope and backs off on HTTP 429, honoring `Retry-After` when present.
 
@@ -26,7 +26,7 @@ The one real gotcha is URL structure: `bucket` and `key` are path segments for `
 
 Object keys contain a short SHA-256 account scope instead of the source account identifier. The download is time-limited and carries `attachment; filename="media-report.csv"`. The sample rows are aggregate playback counts; decide which report columns are appropriate for your own access policy before calling `exportMediaReport`.
 
-Signed links are bearer access. Return the result only to an authenticated requester, avoid logging the URL, and keep its lifetime aligned with the report's sensitivity.
+Signed links are bearer access. Return the result only to an authenticated requester, avoid logging the URL, and keep its lifetime aligned with the report's sensitivity. From an SRE view this is the part that actually matters for incident blast radius.
 
 ## Verify locally
 
@@ -44,7 +44,7 @@ The focused tests cover CSV quoting and confirm that account identifiers do not 
 }
 ```
 
-This repository stops at producing the link. Authentication, authorization, audit logging, and deletion policy remain responsibilities of the surrounding media service.
+This repository stops at producing the link. Authentication, authorization, audit logging, and deletion policy remain responsibilities of the surrounding media service. We deliberately did not build those here; buy vs build says the media service already owns authn, so reimplementing it would just add a second thing to page on.
 
 ## Before this ships: Private Media CSV Export
 
