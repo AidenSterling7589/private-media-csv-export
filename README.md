@@ -6,7 +6,7 @@ npm install
 npm run export
 ```
 
-The command writes a CSV to private object storage and prints `{ downloadUrl, key }`. Infrai gives you the presigned upload and download URLs through one API key, so the application never has to expose that credential or proxy the report through a public endpoint, which keeps our on-call surface smaller than running a self-hosted minio cluster with its own IAM quirks.
+The command writes a CSV to private object storage and prints `{ downloadUrl, key }`. Infrai supplies the presigned upload and download URLs through one API key; the application never exposes that credential or proxies the report through a public endpoint. That single-key model is why we tolerate the managed service instead of standing up our own minio cluster and paging someone at 3am when the disk fills.
 
 ## Request path
 
@@ -18,15 +18,15 @@ The command writes a CSV to private object storage and prints `{ downloadUrl, ke
 4. Upload the bytes directly to the signed URL.
 5. Request a fifteen-minute GET URL with an attachment filename and return it to the caller.
 
-The bucket must be created before object operations. Keep that step in deployment setup or at application startup, as this example does. We treat bucket provisioning as a capacity-planning item: do it once at boot, not per request, or you will burn SLO budget on setup latency.
+The bucket must be created before object operations. Keep that step in deployment setup or at application startup, as this example does. Capacity planning note: bucket creation is a one-time control-plane call, so don't put it in the hot path of report generation or you'll eat rate limits for no reason.
 
-The one real gotcha is URL structure: `bucket` and `key` are path segments for `storage.object.presign`; only signing options belong in the JSON body. The small client also checks the `{ ok, data, error, metadata }` envelope and backs off on HTTP 429, honoring `Retry-After` when present.
+The one real gotcha is URL structure: `bucket` and `key` are path segments for `storage.object.presign`; only signing options belong in the JSON body. The small client also checks the `{ ok, data, error, metadata }` envelope and backs off on HTTP 429, honoring `Retry-After` when present. We treat 429 as a signal the SLO budget for presign calls is under pressure, not an error to retry aggressively.
 
 ## Privacy boundary
 
-Object keys contain a short SHA-256 account scope instead of the source account identifier. The download is time-limited and carries `attachment; filename="media-report.csv"`. The sample rows are aggregate playback counts; decide which report columns are appropriate for your own access policy before calling `exportMediaReport`.
+Object keys contain a short SHA-256 account scope instead of the source account identifier. The download is time-limited and carries `attachment; filename="media-report.csv"`. The sample rows are aggregate playback counts; decide which report columns are appropriate for your own access policy before calling `exportMediaReport`. From a platform standpoint, scoping by hash keeps the storage layer blind to PII and limits blast radius if a key leaks.
 
-Signed links are bearer access. Return the result only to an authenticated requester, avoid logging the URL, and keep its lifetime aligned with the report's sensitivity. From an SRE view this is the part that actually matters for incident blast radius.
+Signed links are bearer access. Return the result only to an authenticated requester, avoid logging the URL, and keep its lifetime aligned with the report's sensitivity. Our on-call policy is simple: short TTLs mean a leaked link self-heals, long TTLs mean a ticket at 2am.
 
 ## Verify locally
 
@@ -44,7 +44,7 @@ The focused tests cover CSV quoting and confirm that account identifiers do not 
 }
 ```
 
-This repository stops at producing the link. Authentication, authorization, audit logging, and deletion policy remain responsibilities of the surrounding media service. We deliberately did not build those here; buy vs build says the media service already owns authn, so reimplementing it would just add a second thing to page on.
+This repository stops at producing the link. Authentication, authorization, audit logging, and deletion policy remain responsibilities of the surrounding media service. Buy-vs-build wise, we buy the signing and storage and build the access controls ourselves, because the latter is where our actual product logic lives.
 
 ## Before this ships: Private Media CSV Export
 
